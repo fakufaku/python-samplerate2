@@ -1,5 +1,5 @@
 /*
- * Python bindings for resampack
+ * Python bindings for libsamplerate
  * Copyright (C) 2023  Robin Scheibler
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
