@@ -33,6 +33,7 @@
 #include <vector>
 
 namespace py = pybind11;
+using namespace pybind11::literals;
 
 py::array_t<float, py::array::c_style> resample_impl(
     py::array_t<float, py::array::c_style | py::array::forcecast> input,
@@ -44,7 +45,8 @@ py::array_t<float, py::array::c_style> resample_impl(
 
   // set the number of channels
   int channels = 1;
-  if (inbuf.ndim == 2) channels = inbuf.shape[1];
+  if (inbuf.ndim == 2)
+    channels = inbuf.shape[1];
   else if (inbuf.ndim > 2)
     throw std::runtime_error("Input array should have at most 2 dimensions");
 
@@ -54,8 +56,7 @@ py::array_t<float, py::array::c_style> resample_impl(
 
   // allocate output array
   std::vector<size_t> out_shape{new_size};
-  if (inbuf.ndim == 2)
-    out_shape.push_back(size_t(channels));
+  if (inbuf.ndim == 2) out_shape.push_back(size_t(channels));
   auto output = py::array_t<float, py::array::c_style>(out_shape);
   py::buffer_info outbuf = output.request();
 
@@ -64,7 +65,7 @@ py::array_t<float, py::array::c_style> resample_impl(
       static_cast<float *>(inbuf.ptr),   // data_in
       static_cast<float *>(outbuf.ptr),  // data_out
       inbuf.shape[0],                    // input_frames
-      long(new_size),                          // output_frames
+      long(new_size),                    // output_frames
       0,        // input_frames_used, filled by libsamplerate
       0,        // output_frames_gen, filled by libsamplerate
       0,        // end_of_input, not used by src_simple ?
@@ -80,7 +81,16 @@ py::array_t<float, py::array::c_style> resample_impl(
 
 PYBIND11_MODULE(resampack, m) {
   m.doc() =
-      "A simple wrapper around libsamplerate";  // optional module docstring
+      "A simple python wrapper library around libsamplerate";  // optional
+                                                               // module
+                                                               // docstring
 
-  m.def("resample", &resample_impl, "Resample function");
+  m.def("resample", &resample_impl, "Resample function", "input"_a,
+        "orig_freq"_a, "new_freq"_a,
+        "converter_type"_a = int(SRC_SINC_BEST_QUALITY));
+  m.attr("SINC_BEST") = int(SRC_SINC_BEST_QUALITY);
+  m.attr("SINC_MEDIUM") = int(SRC_SINC_MEDIUM_QUALITY);
+  m.attr("SINC_FASTEST") = int(SRC_SINC_FASTEST);
+  m.attr("ZERO_ORDER_HOLD") = int(SRC_ZERO_ORDER_HOLD);
+  m.attr("LINEAR") = int(SRC_LINEAR);
 }
