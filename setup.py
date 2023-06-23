@@ -80,7 +80,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="resampack",
-    version="0.0.1a1",
+    version="0.0.1a2",
     author="Robin Scheibler",
     author_email="fakufaku@gmail.com",
     url="https://github.com/fakufaku/resampack",

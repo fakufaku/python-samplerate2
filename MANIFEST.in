@@ -1,6 +1,7 @@
 # The header files for the compiled extension
 include src/resampack.cpp
 include CMakeLists.txt
+include external/CMakeLists.txt
 
 #include pyproject.toml
 include requirements.txt
