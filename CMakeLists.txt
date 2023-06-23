@@ -32,7 +32,6 @@ find_package(PythonInterp)
 
 # This goes after, since it uses PythonInterp as hint
 find_package(PythonLibs)
-#find_package(Numpy)
 
 # Use just one of these:
 if (MSVC)
@@ -42,10 +41,8 @@ else()
   set(PYBIND11_CPP_STANDARD -std=c++14)
 endif()
 
-set(BUILD_TESTING OFF CACHE BOOL "Disable libsamplerate test build")
-add_subdirectory(external/libsamplerate)
-
-add_subdirectory(external/pybind11)
+# adds the external dependencies
+add_subdirectory(external)
 
 pybind11_add_module(resampack src/resampack.cpp)
 

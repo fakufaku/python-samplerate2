@@ -29,10 +29,7 @@
 #include <pybind11/stl.h>
 #include <samplerate.h>
 
-#include <algorithm>
-#include <cassert>
 #include <cmath>
-#include <cstdint>
 #include <vector>
 
 namespace py = pybind11;
@@ -48,7 +45,7 @@ py::array_t<float, py::array::c_style> resample_impl(
   // set the number of channels
   int channels = 1;
   if (inbuf.ndim == 2) channels = inbuf.shape[1];
-  if (inbuf.ndim > 2)
+  else if (inbuf.ndim > 2)
     throw std::runtime_error("Input array should have at most 2 dimensions");
 
   //
@@ -56,7 +53,9 @@ py::array_t<float, py::array::c_style> resample_impl(
   const size_t new_size = size_t(std::ceil(inbuf.shape[0] * sr_ratio));
 
   // allocate output array
-  std::vector<size_t> out_shape{new_size, size_t(channels)};
+  std::vector<size_t> out_shape{new_size};
+  if (inbuf.ndim == 2)
+    out_shape.push_back(size_t(channels));
   auto output = py::array_t<float, py::array::c_style>(out_shape);
   py::buffer_info outbuf = output.request();
 
