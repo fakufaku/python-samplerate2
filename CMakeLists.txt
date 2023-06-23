@@ -41,9 +41,6 @@ else()
   set(PYBIND11_CPP_STANDARD -std=c++14)
 endif()
 
-# adds the external dependencies
-add_subdirectory(external)
-
 pybind11_add_module(resampack src/resampack.cpp)
 
 target_include_directories(resampack PRIVATE ${PYTHON_INCLUDE_DIRS})
