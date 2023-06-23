@@ -1,0 +1,6 @@
+# The header files for the compiled extension
+include src/resampack.cpp
+
+#include pyproject.toml
+#include requirements.txt
+#include LICENSE
