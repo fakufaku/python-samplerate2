@@ -88,7 +88,7 @@ def test_quality_sine(sr_orig, sr_new, fil, rms):
 
     x, _ = make_tone(FREQ, sr_orig, DURATION)
     y, _ = make_tone(FREQ, sr_new, DURATION)
-    y_pred = resampack.resample(x, sr_orig, sr_new, fil)
+    y_pred = resampack.resample(x, sr_new / sr_orig, fil)
 
     idx = slice(sr_new // 2, -sr_new // 2)
 
@@ -115,7 +115,7 @@ def test_quality_sweep(sr_orig, sr_new, fil, rms):
     x = x[::-1]
     y = y[::-1]
 
-    y_pred = resampack.resample(x, sr_orig, sr_new, fil)
+    y_pred = resampack.resample(x, sr_new / sr_orig, fil)
 
     idx = slice(sr_new // 2, -sr_new // 2)
 
