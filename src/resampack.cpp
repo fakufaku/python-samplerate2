@@ -30,10 +30,48 @@
 #include <samplerate.h>
 
 #include <cmath>
+#include <iostream>
+#include <string>
+#include <typeinfo>
 #include <vector>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
+
+enum ConverterType {
+  sinc_best = 0,
+  sinc_medium,
+  sinc_fastest,
+  zero_order_hold,
+  linear
+};
+
+int get_converter_type(const py::object &obj) {
+  if (py::isinstance<py::str>(obj)) {
+    py::str py_s = obj;
+    std::string s = static_cast<std::string>(py_s);
+    if (s.compare("sinc_best") == 0) {
+      return 0;
+    } else if (s.compare("sinc_medium") == 0) {
+      return 1;
+    } else if (s.compare("sinc_fastest") == 0) {
+      return 2;
+    } else if (s.compare("zero_order_hold") == 0) {
+      return 3;
+    } else if (s.compare("linear") == 0) {
+      return 4;
+    }
+  } else if (py::isinstance<py::int_>(obj)) {
+    py::int_ val = obj;
+    return static_cast<int>(val);
+  } else if (py::isinstance<ConverterType>(obj)) {
+    py::int_ c = obj.attr("value");
+    return static_cast<int>(c);
+  }
+
+  std::runtime_error("Unsupported converter type");
+  return -1;
+}
 
 class Resampler {
  private:
@@ -45,20 +83,22 @@ class Resampler {
   int _channels = 0;
 
  private:
-  void _process_error(int) {}
+  void _process_error() {
+    if (_err_num != 0) std::runtime_error(src_strerror(_err_num));
+  }
 
  public:
-  Resampler(int converter_type, int channels)
-      : _converter_type(converter_type), _channels(channels) {
+  Resampler(const py::object &converter_type, int channels)
+      : _converter_type(get_converter_type(converter_type)),
+        _channels(channels) {
     _state = src_new(_converter_type, _channels, &_err_num);
-    if (_err_num != 0) std::runtime_error(src_strerror(_err_num));
   }
 
   // copy constructor
   Resampler(const Resampler &r)
       : _converter_type(r._converter_type), _channels(r._channels) {
     _state = src_clone(r._state, &_err_num);
-    if (_err_num != 0) std::runtime_error(src_strerror(_err_num));
+    _process_error();
   }
 
   ~Resampler() { src_delete(_state); }
@@ -99,9 +139,8 @@ class Resampler {
         sr_ratio       // src_ratio, sampling rate conversion ratio
     };
 
-    int ret_code = src_process(_state, &src_data);
-
-    if (ret_code != 0) std::runtime_error(src_strerror(ret_code));
+    _err_num = src_process(_state, &src_data);
+    _process_error();
 
     // create a shorter view of the array
     if ((size_t)src_data.output_frames_gen < new_size) {
@@ -114,13 +153,13 @@ class Resampler {
   }
 
   void set_ratio(double new_ratio) {
-    int ret_code = src_set_ratio(_state, new_ratio);
-    if (ret_code != 0) std::runtime_error(src_strerror(ret_code));
+    _err_num = src_set_ratio(_state, new_ratio);
+    _process_error();
   }
 
   void reset() {
-    int ret_code = src_reset(_state);
-    if (ret_code != 0) std::runtime_error(src_strerror(ret_code));
+    _err_num = src_reset(_state);
+    _process_error();
   }
 
   Resampler clone() const { return Resampler(*this); }
@@ -128,8 +167,9 @@ class Resampler {
 
 py::array_t<float, py::array::c_style> resample_impl(
     py::array_t<float, py::array::c_style | py::array::forcecast> input,
-    double sr_ratio, int converter_type = SRC_SINC_BEST_QUALITY) {
+    double sr_ratio, const py::object &converter_type) {
   // input array has shape (n_samples, n_channels)
+  int converter_type_int = get_converter_type(converter_type);
 
   // accessors for the arrays
   py::buffer_info inbuf = input.request();
@@ -161,7 +201,7 @@ py::array_t<float, py::array::c_style> resample_impl(
       sr_ratio  // src_ratio, sampling rate conversion ratio
   };
 
-  int ret_code = src_simple(&src_data, converter_type, channels);
+  int ret_code = src_simple(&src_data, converter_type_int, channels);
 
   if (ret_code != 0) std::runtime_error(src_strerror(ret_code));
 
@@ -181,11 +221,17 @@ PYBIND11_MODULE(resampack, m) {
                                                                // module
                                                                // docstring
 
+  // give access to this function for testing
+  m.def("_get_converter_type", &get_converter_type,
+        "Convert python object to integer of converter tpe or raise an error "
+        "if illegal");
+
   m.def("resample", &resample_impl, "Resample function", "input"_a, "ratio"_a,
         "converter_type"_a = int(SRC_SINC_BEST_QUALITY));
 
   py::class_<Resampler>(m, "Resampler")
-      .def(py::init<int, int>(), "converter_type"_a = 0, "channels"_a = 1)
+      .def(py::init<const py::object &, int>(), "converter_type"_a = 0,
+           "channels"_a = 1)
       .def(py::init<Resampler>())
       .def("process", &Resampler::process, "Process a block of data", "input"_a,
            "ratio"_a, "end_of_input"_a = false)
@@ -197,9 +243,11 @@ PYBIND11_MODULE(resampack, m) {
       .def_readonly("channels", &Resampler::_channels,
                     "The number of channels");
 
-  m.attr("SINC_BEST") = int(SRC_SINC_BEST_QUALITY);
-  m.attr("SINC_MEDIUM") = int(SRC_SINC_MEDIUM_QUALITY);
-  m.attr("SINC_FASTEST") = int(SRC_SINC_FASTEST);
-  m.attr("ZERO_ORDER_HOLD") = int(SRC_ZERO_ORDER_HOLD);
-  m.attr("LINEAR") = int(SRC_LINEAR);
+  py::enum_<ConverterType>(m, "ConverterType")
+      .value("sinc_best", sinc_best)
+      .value("sinc_medium", sinc_medium)
+      .value("sinc_fastest", sinc_fastest)
+      .value("zero_order_hold", zero_order_hold)
+      .value("linear", linear)
+      .export_values();
 }

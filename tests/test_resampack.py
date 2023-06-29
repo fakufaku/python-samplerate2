@@ -77,9 +77,9 @@ def make_sweep(T, fs, f_lo=0.0, f_hi=None, fade=None, ascending=False):
 @pytest.mark.parametrize(
     "fil,rms",
     [
-        (resampack.SINC_BEST, 1e-6),
-        (resampack.SINC_MEDIUM, 1e-5),
-        (resampack.SINC_FASTEST, 1e-4),
+        (resampack.ConverterType.sinc_best, 1e-6),
+        (resampack.ConverterType.sinc_medium, 1e-5),
+        (resampack.ConverterType.sinc_fastest, 1e-4),
     ],
 )
 def test_quality_sine(sr_orig, sr_new, fil, rms):
@@ -100,9 +100,9 @@ def test_quality_sine(sr_orig, sr_new, fil, rms):
 @pytest.mark.parametrize(
     "fil,rms",
     [
-        (resampack.SINC_BEST, 1e-6),
-        (resampack.SINC_MEDIUM, 1e-5),
-        (resampack.SINC_FASTEST, 1e-4),
+        (resampack.ConverterType.sinc_best, 1e-6),
+        (resampack.ConverterType.sinc_medium, 1e-5),
+        (resampack.ConverterType.sinc_fastest, 1e-4),
     ],
 )
 def test_quality_sweep(sr_orig, sr_new, fil, rms):
