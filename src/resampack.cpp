@@ -24,6 +24,7 @@
  * If not, see <https://opensource.org/licenses/MIT>.
  */
 
+#include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -38,6 +39,12 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
+using callback_t =
+    std::function<py::array_t<float, py::array::c_style | py::array::forcecast>(
+        void)>;
+using np_array_f32 =
+    py::array_t<float, py::array::c_style | py::array::forcecast>;
+
 enum ConverterType {
   sinc_best = 0,
   sinc_medium,
@@ -45,6 +52,8 @@ enum ConverterType {
   zero_order_hold,
   linear
 };
+
+long the_callback_func(void *cb_data, float **data);
 
 int get_converter_type(const py::object &obj) {
   if (py::isinstance<py::str>(obj)) {
@@ -165,8 +174,139 @@ class Resampler {
   Resampler clone() const { return Resampler(*this); }
 };
 
+class CallbackResampler {
+ private:
+  SRC_STATE *_state = nullptr;
+  int _err_num = 0;
+  callback_t _callback = nullptr;
+  np_array_f32 _current_buffer;
+  size_t _buffer_ndim = 0;
+
+ public:
+  double _ratio = 0.0;
+  int _converter_type = 0;
+  size_t _channels = 0;
+
+ private:
+  void _process_error() {
+    if (_err_num != 0) std::runtime_error(src_strerror(_err_num));
+  }
+
+ public:
+  CallbackResampler(const callback_t &callback_func, double ratio,
+                    const py::object &converter_type, size_t channels)
+      : _callback(callback_func),
+        _ratio(ratio),
+        _converter_type(get_converter_type(converter_type)),
+        _channels(channels) {
+    _state = src_callback_new(the_callback_func, _converter_type, (int)_channels,
+                              &_err_num, static_cast<void *>(this));
+  }
+
+  // copy constructor
+  CallbackResampler(const CallbackResampler &r)
+      : _callback(r._callback),
+        _ratio(r._ratio),
+        _converter_type(r._converter_type),
+        _channels(r._channels) {
+    _state = src_clone(r._state, &_err_num);
+    _process_error();
+  }
+
+  ~CallbackResampler() { src_delete(_state); }
+
+  void set_buffer(const np_array_f32 &new_buf) { _current_buffer = new_buf; }
+  size_t get_channels() { return _channels; }
+
+  np_array_f32 callback(void) {
+    auto input = _callback();
+
+    auto inbuf = input.request();
+    if (_buffer_ndim == 0) _buffer_ndim = inbuf.ndim;
+
+    _current_buffer = input;
+    return input;
+  }
+
+  py::array_t<float, py::array::c_style> read(size_t frames) {
+    // allocate output array
+    std::vector<size_t> out_shape{frames, _channels};
+    auto output = py::array_t<float, py::array::c_style>(out_shape);
+    py::buffer_info outbuf = output.request();
+
+    // read from the callback
+    size_t output_frames_gen = src_callback_read(
+        _state, _ratio, (long)frames, static_cast<float *>(outbuf.ptr));
+
+    // check error status
+    if (output_frames_gen == 0) {
+      _err_num = src_error(_state);
+      _process_error();
+    }
+
+    // if there is only one channel and the input array had only on dimension
+    // we also output a 1D array
+    if (_channels == 1 and _buffer_ndim == 1) {
+      out_shape.pop_back();
+      output = py::array_t<float, py::array::c_style>(
+          out_shape, static_cast<float *>(outbuf.ptr));
+    }
+
+    // create a shorter view of the array
+    if (output_frames_gen < frames) {
+      out_shape[0] = output_frames_gen;
+      output = py::array_t<float, py::array::c_style>(
+          out_shape, static_cast<float *>(outbuf.ptr));
+    }
+
+    return output;
+  }
+
+  void set_starting_ratio(double new_ratio) {
+    _err_num = src_set_ratio(_state, new_ratio);
+    _process_error();
+    _ratio = new_ratio;
+  }
+
+  void reset() {
+    _err_num = src_reset(_state);
+    _process_error();
+  }
+
+  CallbackResampler clone() const { return CallbackResampler(*this); }
+};
+
+long the_callback_func(void *cb_data, float **data) {
+  CallbackResampler *cb = static_cast<CallbackResampler *>(cb_data);
+  int cb_channels = cb->get_channels();
+
+  // get the data as a numpy array
+  auto input = cb->callback();
+
+  // accessors for the arrays
+  py::buffer_info inbuf = input.request();
+
+  // end of stream is signaled by a None, which is cast to a ndarray with ndim == 0
+  if (inbuf.ndim == 0)
+    return 0;
+
+  // set the number of channels
+  int channels = 1;
+  if (inbuf.ndim == 2)
+    channels = inbuf.shape[1];
+  else if (inbuf.ndim > 2)
+    throw std::runtime_error("Input array should have at most 2 dimensions");
+
+  if (channels != cb_channels)
+    throw std::runtime_error("Invalid number of channels in input data.");
+
+  *data = static_cast<float *>(inbuf.ptr);
+
+  return (long)inbuf.shape[0];
+}
+
 py::array_t<float, py::array::c_style> resample_impl(
-    py::array_t<float, py::array::c_style | py::array::forcecast> input,
+    const py::array_t<float, py::array::c_style | py::array::forcecast> &input,
     double sr_ratio, const py::object &converter_type) {
   // input array has shape (n_samples, n_channels)
   int converter_type_int = get_converter_type(converter_type);
@@ -241,6 +381,22 @@ PYBIND11_MODULE(resampack, m) {
       .def_readonly("converter_type", &Resampler::_converter_type,
                     "The converter type")
       .def_readonly("channels", &Resampler::_channels,
+                    "The number of channels");
+
+  py::class_<CallbackResampler>(m, "CallbackResampler")
+      .def(py::init<const callback_t &, double, const py::object &, int>(),
+           "callback"_a, "ratio"_a, "converter_type"_a = 0, "channels"_a = 1)
+      .def(py::init<CallbackResampler>())
+      .def("read", &CallbackResampler::read,
+           "Read a block of data from the callback", "num_frames"_a)
+      .def("reset", &CallbackResampler::reset, "Reset the resampling process")
+      .def("set_starting_ratio", &CallbackResampler::set_starting_ratio,
+           "Change the sampling ratio")
+      .def("clone", &CallbackResampler::clone,
+           "Create a copy of the resampler object")
+      .def_readonly("converter_type", &CallbackResampler::_converter_type,
+                    "The converter type")
+      .def_readonly("channels", &CallbackResampler::_channels,
                     "The number of channels");
 
   py::enum_<ConverterType>(m, "ConverterType")
