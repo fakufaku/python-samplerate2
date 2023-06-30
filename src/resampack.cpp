@@ -246,7 +246,7 @@ class CallbackResampler {
 
     // if there is only one channel and the input array had only on dimension
     // we also output a 1D array
-    if (_channels == 1 and _buffer_ndim == 1) {
+    if (_channels == 1 && _buffer_ndim == 1) {
       out_shape.pop_back();
       output = py::array_t<float, py::array::c_style>(
           out_shape, static_cast<float *>(outbuf.ptr));
