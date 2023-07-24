@@ -355,7 +355,7 @@ py::array_t<float, py::array::c_style> resample_impl(
   return output;
 }
 
-PYBIND11_MODULE(resampack, m) {
+PYBIND11_MODULE(samplerate2, m) {
   m.doc() =
       "A simple python wrapper library around libsamplerate";  // optional
                                                                // module

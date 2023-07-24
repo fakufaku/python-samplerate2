@@ -79,15 +79,15 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="resampack",
+    name="samplerate2",
     version="0.0.1a2",
     author="Robin Scheibler",
     author_email="fakufaku@gmail.com",
-    url="https://github.com/fakufaku/resampack",
+    url="https://github.com/fakufaku/python-samplerate2",
     description="Monolithic python wrapper for libsamplerate",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    ext_modules=[CMakeExtension("resampack")],
+    ext_modules=[CMakeExtension("samplerate2")],
     packages=setuptools.find_packages(),
     install_requires=["numpy"],
     cmdclass={"build_ext": CMakeBuild},

@@ -1,5 +1,5 @@
 import numpy as np
-import resampack
+import samplerate2
 import pytest
 
 
@@ -77,9 +77,9 @@ def make_sweep(T, fs, f_lo=0.0, f_hi=None, fade=None, ascending=False):
 @pytest.mark.parametrize(
     "fil,rms",
     [
-        (resampack.ConverterType.sinc_best, 1e-6),
-        (resampack.ConverterType.sinc_medium, 1e-5),
-        (resampack.ConverterType.sinc_fastest, 1e-4),
+        (samplerate2.ConverterType.sinc_best, 1e-6),
+        (samplerate2.ConverterType.sinc_medium, 1e-5),
+        (samplerate2.ConverterType.sinc_fastest, 1e-4),
     ],
 )
 def test_quality_sine(sr_orig, sr_new, fil, rms):
@@ -88,7 +88,7 @@ def test_quality_sine(sr_orig, sr_new, fil, rms):
 
     x, _ = make_tone(FREQ, sr_orig, DURATION)
     y, _ = make_tone(FREQ, sr_new, DURATION)
-    y_pred = resampack.resample(x, sr_new / sr_orig, fil)
+    y_pred = samplerate2.resample(x, sr_new / sr_orig, fil)
 
     idx = slice(sr_new // 2, -sr_new // 2)
 
@@ -100,9 +100,9 @@ def test_quality_sine(sr_orig, sr_new, fil, rms):
 @pytest.mark.parametrize(
     "fil,rms",
     [
-        (resampack.ConverterType.sinc_best, 1e-6),
-        (resampack.ConverterType.sinc_medium, 1e-5),
-        (resampack.ConverterType.sinc_fastest, 1e-4),
+        (samplerate2.ConverterType.sinc_best, 1e-6),
+        (samplerate2.ConverterType.sinc_medium, 1e-5),
+        (samplerate2.ConverterType.sinc_fastest, 1e-4),
     ],
 )
 def test_quality_sweep(sr_orig, sr_new, fil, rms):
@@ -115,7 +115,7 @@ def test_quality_sweep(sr_orig, sr_new, fil, rms):
     x = x[::-1]
     y = y[::-1]
 
-    y_pred = resampack.resample(x, sr_new / sr_orig, fil)
+    y_pred = samplerate2.resample(x, sr_new / sr_orig, fil)
 
     idx = slice(sr_new // 2, -sr_new // 2)
 

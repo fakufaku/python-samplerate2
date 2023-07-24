@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import resampack
+import samplerate2
 
 
 @pytest.fixture(scope="module", params=[1, 2])
@@ -25,19 +25,19 @@ def converter_type(request):
 
 def test_simple(data, converter_type, ratio=2.0):
     _, input_data = data
-    resampack.resample(input_data, ratio, converter_type)
+    samplerate2.resample(input_data, ratio, converter_type)
 
 
 def test_process(data, converter_type, ratio=2.0):
     num_channels, input_data = data
-    src = resampack.Resampler(converter_type, num_channels)
+    src = samplerate2.Resampler(converter_type, num_channels)
     src.process(input_data, ratio)
 
 
 def test_match(data, converter_type, ratio=2.0):
     num_channels, input_data = data
-    output_simple = resampack.resample(input_data, ratio, converter_type)
-    resampler = resampack.Resampler(converter_type, channels=num_channels)
+    output_simple = samplerate2.resample(input_data, ratio, converter_type)
+    resampler = samplerate2.Resampler(converter_type, channels=num_channels)
     output_full = resampler.process(input_data, ratio, end_of_input=True)
     assert np.allclose(output_simple, output_full)
 
@@ -53,7 +53,7 @@ def test_callback(data, converter_type, ratio=2.0):
     callback = lambda p=producer(): next(p)
     channels = input_data.shape[-1] if input_data.ndim == 2 else 1
 
-    resampler = resampack.CallbackResampler(callback, ratio, converter_type, channels)
+    resampler = samplerate2.CallbackResampler(callback, ratio, converter_type, channels)
     resampler.read(int(ratio) * input_data.shape[0])
 
 
@@ -70,13 +70,13 @@ def test_callback(data, converter_type, ratio=2.0):
         ("sinc_fastest", 2),
         ("zero_order_hold", 3),
         ("linear", 4),
-        (resampack.ConverterType.sinc_best, 0),
-        (resampack.ConverterType.sinc_medium, 1),
-        (resampack.ConverterType.sinc_fastest, 2),
-        (resampack.ConverterType.zero_order_hold, 3),
-        (resampack.ConverterType.linear, 4),
+        (samplerate2.ConverterType.sinc_best, 0),
+        (samplerate2.ConverterType.sinc_medium, 1),
+        (samplerate2.ConverterType.sinc_fastest, 2),
+        (samplerate2.ConverterType.zero_order_hold, 3),
+        (samplerate2.ConverterType.linear, 4),
     ],
 )
 def test_converter_type(input_obj, expected_type):
-    ret = resampack._get_converter_type(input_obj)
+    ret = samplerate2._get_converter_type(input_obj)
     assert ret == expected_type

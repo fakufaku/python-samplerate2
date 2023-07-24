@@ -25,7 +25,7 @@ message("The cmake module path ${CMAKE_MODULE_PATH}")
 message("The current source dir ${CMAKE_CURRENT_SOURCE_DIR}")
 
 
-project(resampack)
+project(samplerate2)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(PythonInterp)
@@ -44,33 +44,33 @@ endif()
 # adds the external dependencies
 add_subdirectory(external)
 
-pybind11_add_module(resampack src/resampack.cpp)
+pybind11_add_module(samplerate2 src/samplerate2.cpp)
 
-target_include_directories(resampack PRIVATE ${PYTHON_INCLUDE_DIRS})
-target_include_directories(resampack PRIVATE ${NUMPY_INCLUDE_DIRS})
-target_include_directories(resampack PRIVATE ./external/libsamplerate/include)
+target_include_directories(samplerate2 PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_include_directories(samplerate2 PRIVATE ${NUMPY_INCLUDE_DIRS})
+target_include_directories(samplerate2 PRIVATE ./external/libsamplerate/include)
 
 if(MSVC)
-    target_compile_options(resampack PRIVATE /EHsc /MP /bigobj)
+    target_compile_options(samplerate2 PRIVATE /EHsc /MP /bigobj)
     set(CMAKE_EXE_LINKER_FLAGS /MANIFEST:NO)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
     CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR
     (CMAKE_CXX_COMPILER_ID MATCHES "Intel" AND NOT WIN32))
-    target_compile_options(resampack PRIVATE -std=c++14 -O3 -Wall -Wextra)
-    # target_compile_options(resampack PRIVATE -std=c++14 -Wall -Wextra -g)
+    target_compile_options(samplerate2 PRIVATE -std=c++14 -O3 -Wall -Wextra)
+    # target_compile_options(samplerate2 PRIVATE -std=c++14 -Wall -Wextra -g)
 endif()
 
 add_definitions(-DVERBOSE=1)
 
 ### Final target setup
 set_target_properties(
-    resampack
+    samplerate2
     PROPERTIES
         PREFIX ""
-        OUTPUT_NAME "resampack"
+        OUTPUT_NAME "samplerate2"
         LINKER_LANGUAGE C
     )
 
-target_link_libraries(resampack PUBLIC samplerate)
+target_link_libraries(samplerate2 PUBLIC samplerate)
