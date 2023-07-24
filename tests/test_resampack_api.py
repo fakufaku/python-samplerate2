@@ -57,6 +57,25 @@ def test_callback(data, converter_type, ratio=2.0):
     resampler.read(int(ratio) * input_data.shape[0])
 
 
+def test_callback_with(data, converter_type, ratio=2.0):
+    from samplerate2 import CallbackResampler
+
+    _, input_data = data
+
+    def producer():
+        yield input_data
+        while True:
+            yield None
+
+    callback = lambda p=producer(): next(p)
+    channels = input_data.shape[-1] if input_data.ndim == 2 else 1
+
+    with CallbackResampler(
+        callback, ratio, converter_type, channels=channels
+    ) as resampler:
+        resampler.read(int(ratio) * input_data.shape[0])
+
+
 @pytest.mark.parametrize(
     "input_obj,expected_type",
     [

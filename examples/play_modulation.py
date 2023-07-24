@@ -9,7 +9,7 @@ mixed onto the carrier.
 from __future__ import print_function, division
 import numpy as np
 import sounddevice as sd
-import resampack as sr
+import samplerate2 as sr
 
 source_samplerate = 3600
 target_samplerate = 44100
@@ -94,20 +94,20 @@ def main(source_samplerate, target_samplerate, params, converter_type):
 
     ratio = target_samplerate / source_samplerate
 
-    resampler = sr.CallbackResampler(
+    with sr.CallbackResampler(
         get_input_callback(source_samplerate, params), ratio, converter_type
-    )
-    with sd.OutputStream(
-        channels=1,
-        samplerate=target_samplerate,
-        callback=get_playback_callback(resampler, target_samplerate, params),
-    ):
-        print("Playing back...  Ctrl+C to stop.")
-        try:
-            while True:
-                sleep(1)
-        except KeyboardInterrupt:
-            print("Aborting.")
+    ) as resampler:
+        with sd.OutputStream(
+            channels=1,
+            samplerate=target_samplerate,
+            callback=get_playback_callback(resampler, target_samplerate, params),
+        ):
+            print("Playing back...  Ctrl+C to stop.")
+            try:
+                while True:
+                    sleep(1)
+            except KeyboardInterrupt:
+                print("Aborting.")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-name: resampack
+name: samplerate2
 
 on: [push, pull_request]
 

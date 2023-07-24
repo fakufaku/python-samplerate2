@@ -199,8 +199,9 @@ class CallbackResampler {
         _ratio(ratio),
         _converter_type(get_converter_type(converter_type)),
         _channels(channels) {
-    _state = src_callback_new(the_callback_func, _converter_type, (int)_channels,
-                              &_err_num, static_cast<void *>(this));
+    _state =
+        src_callback_new(the_callback_func, _converter_type, (int)_channels,
+                         &_err_num, static_cast<void *>(this));
   }
 
   // copy constructor
@@ -274,6 +275,9 @@ class CallbackResampler {
   }
 
   CallbackResampler clone() const { return CallbackResampler(*this); }
+  CallbackResampler &__enter__() { return *this; }
+  void __exit__(const py::object &exc_type, const py::object &exc,
+                const py::object &exc_tb) const {}
 };
 
 long the_callback_func(void *cb_data, float **data) {
@@ -286,9 +290,9 @@ long the_callback_func(void *cb_data, float **data) {
   // accessors for the arrays
   py::buffer_info inbuf = input.request();
 
-  // end of stream is signaled by a None, which is cast to a ndarray with ndim == 0
-  if (inbuf.ndim == 0)
-    return 0;
+  // end of stream is signaled by a None, which is cast to a ndarray with ndim
+  // == 0
+  if (inbuf.ndim == 0) return 0;
 
   // set the number of channels
   int channels = 1;
@@ -394,6 +398,10 @@ PYBIND11_MODULE(samplerate2, m) {
            "Change the sampling ratio")
       .def("clone", &CallbackResampler::clone,
            "Create a copy of the resampler object")
+      .def("__enter__", &CallbackResampler::__enter__,
+           py::return_value_policy::reference_internal)
+      .def("__exit__", &CallbackResampler::__exit__)
+      .def_readwrite("ratio", &CallbackResampler::_ratio)
       .def_readonly("converter_type", &CallbackResampler::_converter_type,
                     "The converter type")
       .def_readonly("channels", &CallbackResampler::_channels,
