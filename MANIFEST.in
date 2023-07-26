@@ -1,5 +1,5 @@
 # The header files for the compiled extension
-include src/resampack.cpp
+include src/samplerate2.cpp
 include CMakeLists.txt
 include external/CMakeLists.txt
 
