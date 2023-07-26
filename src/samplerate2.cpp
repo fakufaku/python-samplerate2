@@ -376,7 +376,7 @@ PYBIND11_MODULE(samplerate2, m) {
       "A simple python wrapper library around libsamplerate";  // optional
                                                                // module
                                                                // docstring
-  m.attr("__version__") = "0.0.1";
+  m.attr("__version__") = "0.0.2";
 
   // give access to this function for testing
   m.def("_get_converter_type", &get_converter_type,

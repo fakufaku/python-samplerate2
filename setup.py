@@ -80,7 +80,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="samplerate2",
-    version="0.0.1",
+    version="0.0.2",
     author="Robin Scheibler",
     author_email="fakufaku@gmail.com",
     url="https://github.com/fakufaku/python-samplerate2",
