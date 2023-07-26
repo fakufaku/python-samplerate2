@@ -55,6 +55,15 @@ enum ConverterType {
 
 long the_callback_func(void *cb_data, float **data);
 
+class ResamplingException : public std::exception {
+public:
+    explicit ResamplingException(int err_num) : message{src_strerror(err_num)} {}
+    const char *what() const noexcept override { return message.c_str(); }
+
+private:
+    std::string message = "";
+};
+
 int get_converter_type(const py::object &obj) {
   if (py::isinstance<py::str>(obj)) {
     py::str py_s = obj;
@@ -78,8 +87,19 @@ int get_converter_type(const py::object &obj) {
     return static_cast<int>(c);
   }
 
-  std::runtime_error("Unsupported converter type");
+  throw std::domain_error("Unsupported converter type");
   return -1;
+}
+
+void error_handler(int errnum) {
+  std::cout << errnum << std::endl;
+  if (errnum > 0 && errnum < 24) {
+    throw ResamplingException(errnum);
+  } else if (errnum != 0) {  // the zero case is excluded as it is not an error
+    // this will throw a segmentation fault if we call src_strerror here
+    // also, these should never happen
+    throw std::runtime_error("libsamplerate raised an unknown error code");
+  }
 }
 
 class Resampler {
@@ -90,11 +110,6 @@ class Resampler {
  public:
   int _converter_type = 0;
   int _channels = 0;
-
- private:
-  void _process_error() {
-    if (_err_num != 0) std::runtime_error(src_strerror(_err_num));
-  }
 
  public:
   Resampler(const py::object &converter_type, int channels)
@@ -107,7 +122,7 @@ class Resampler {
   Resampler(const Resampler &r)
       : _converter_type(r._converter_type), _channels(r._channels) {
     _state = src_clone(r._state, &_err_num);
-    _process_error();
+    error_handler(_err_num);
   }
 
   ~Resampler() { src_delete(_state); }
@@ -123,10 +138,10 @@ class Resampler {
     if (inbuf.ndim == 2)
       channels = inbuf.shape[1];
     else if (inbuf.ndim > 2)
-      throw std::runtime_error("Input array should have at most 2 dimensions");
+      throw std::domain_error("Input array should have at most 2 dimensions");
 
     if (channels != _channels)
-      throw std::runtime_error("Invalid number of channels in input data.");
+      throw std::domain_error("Invalid number of channels in input data.");
 
     const size_t new_size = size_t(std::ceil(inbuf.shape[0] * sr_ratio));
 
@@ -149,7 +164,7 @@ class Resampler {
     };
 
     _err_num = src_process(_state, &src_data);
-    _process_error();
+    error_handler(_err_num);
 
     // create a shorter view of the array
     if ((size_t)src_data.output_frames_gen < new_size) {
@@ -163,12 +178,12 @@ class Resampler {
 
   void set_ratio(double new_ratio) {
     _err_num = src_set_ratio(_state, new_ratio);
-    _process_error();
+    error_handler(_err_num);
   }
 
   void reset() {
     _err_num = src_reset(_state);
-    _process_error();
+    error_handler(_err_num);
   }
 
   Resampler clone() const { return Resampler(*this); }
@@ -186,11 +201,6 @@ class CallbackResampler {
   double _ratio = 0.0;
   int _converter_type = 0;
   size_t _channels = 0;
-
- private:
-  void _process_error() {
-    if (_err_num != 0) std::runtime_error(src_strerror(_err_num));
-  }
 
  public:
   CallbackResampler(const callback_t &callback_func, double ratio,
@@ -211,7 +221,7 @@ class CallbackResampler {
         _converter_type(r._converter_type),
         _channels(r._channels) {
     _state = src_clone(r._state, &_err_num);
-    _process_error();
+    error_handler(_err_num);
   }
 
   ~CallbackResampler() { src_delete(_state); }
@@ -242,7 +252,7 @@ class CallbackResampler {
     // check error status
     if (output_frames_gen == 0) {
       _err_num = src_error(_state);
-      _process_error();
+      error_handler(_err_num);
     }
 
     // if there is only one channel and the input array had only on dimension
@@ -265,13 +275,13 @@ class CallbackResampler {
 
   void set_starting_ratio(double new_ratio) {
     _err_num = src_set_ratio(_state, new_ratio);
-    _process_error();
+    error_handler(_err_num);
     _ratio = new_ratio;
   }
 
   void reset() {
     _err_num = src_reset(_state);
-    _process_error();
+    error_handler(_err_num);
   }
 
   CallbackResampler clone() const { return CallbackResampler(*this); }
@@ -299,10 +309,10 @@ long the_callback_func(void *cb_data, float **data) {
   if (inbuf.ndim == 2)
     channels = inbuf.shape[1];
   else if (inbuf.ndim > 2)
-    throw std::runtime_error("Input array should have at most 2 dimensions");
+    throw std::domain_error("Input array should have at most 2 dimensions");
 
   if (channels != cb_channels)
-    throw std::runtime_error("Invalid number of channels in input data.");
+    throw std::domain_error("Invalid number of channels in input data.");
 
   *data = static_cast<float *>(inbuf.ptr);
 
@@ -323,7 +333,7 @@ py::array_t<float, py::array::c_style> resample_impl(
   if (inbuf.ndim == 2)
     channels = inbuf.shape[1];
   else if (inbuf.ndim > 2)
-    throw std::runtime_error("Input array should have at most 2 dimensions");
+    throw std::domain_error("Input array should have at most 2 dimensions");
 
   const size_t new_size = size_t(std::ceil(inbuf.shape[0] * sr_ratio));
 
@@ -347,7 +357,7 @@ py::array_t<float, py::array::c_style> resample_impl(
 
   int ret_code = src_simple(&src_data, converter_type_int, channels);
 
-  if (ret_code != 0) std::runtime_error(src_strerror(ret_code));
+  error_handler(ret_code);
 
   // create a shorter view of the array
   if ((size_t)src_data.output_frames_gen < new_size) {
@@ -372,6 +382,10 @@ PYBIND11_MODULE(samplerate2, m) {
 
   m.def("resample", &resample_impl, "Resample function", "input"_a, "ratio"_a,
         "converter_type"_a = int(SRC_SINC_BEST_QUALITY));
+
+  m.def("_error_handler", &error_handler, "A function to translate libsamplerate error codes into exceptions");
+
+  py::register_exception<ResamplingException>(m, "ResamplingError", PyExc_RuntimeError);
 
   py::class_<Resampler>(m, "Resampler")
       .def(py::init<const py::object &, int>(), "converter_type"_a = 0,
