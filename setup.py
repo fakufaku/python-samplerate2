@@ -3,15 +3,15 @@
 # Script based on the cmake_example of pybind11 by Dean Moldovan ( https://github.com/pybind/cmake_example )
 
 import os
-import re
-import sys
 import platform
+import re
 import subprocess
+import sys
+from distutils.version import LooseVersion
 
 import setuptools
-from setuptools import setup, Extension
+from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
-from distutils.version import LooseVersion
 
 
 class CMakeExtension(Extension):

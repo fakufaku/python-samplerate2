@@ -1,6 +1,7 @@
 import numpy as np
-import samplerate2
 import pytest
+
+import samplerate2
 
 
 def make_tone(freq, sr, duration):
