@@ -56,12 +56,12 @@ enum ConverterType {
 long the_callback_func(void *cb_data, float **data);
 
 class ResamplingException : public std::exception {
-public:
-    explicit ResamplingException(int err_num) : message{src_strerror(err_num)} {}
-    const char *what() const noexcept override { return message.c_str(); }
+ public:
+  explicit ResamplingException(int err_num) : message{src_strerror(err_num)} {}
+  const char *what() const noexcept override { return message.c_str(); }
 
-private:
-    std::string message = "";
+ private:
+  std::string message = "";
 };
 
 int get_converter_type(const py::object &obj) {
@@ -369,11 +369,14 @@ py::array_t<float, py::array::c_style> resample_impl(
   return output;
 }
 
+py::str version() { return py::str("0.0.1"); }
+
 PYBIND11_MODULE(samplerate2, m) {
   m.doc() =
       "A simple python wrapper library around libsamplerate";  // optional
                                                                // module
                                                                // docstring
+  m.attr("__version__") = "0.0.1";
 
   // give access to this function for testing
   m.def("_get_converter_type", &get_converter_type,
@@ -383,9 +386,11 @@ PYBIND11_MODULE(samplerate2, m) {
   m.def("resample", &resample_impl, "Resample function", "input"_a, "ratio"_a,
         "converter_type"_a = int(SRC_SINC_BEST_QUALITY));
 
-  m.def("_error_handler", &error_handler, "A function to translate libsamplerate error codes into exceptions");
+  m.def("_error_handler", &error_handler,
+        "A function to translate libsamplerate error codes into exceptions");
 
-  py::register_exception<ResamplingException>(m, "ResamplingError", PyExc_RuntimeError);
+  py::register_exception<ResamplingException>(m, "ResamplingError",
+                                              PyExc_RuntimeError);
 
   py::class_<Resampler>(m, "Resampler")
       .def(py::init<const py::object &, int>(), "converter_type"_a = 0,
