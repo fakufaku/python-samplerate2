@@ -76,6 +76,32 @@ def test_callback_with(data, converter_type, ratio=2.0):
         resampler.read(int(ratio) * input_data.shape[0])
 
 
+def test_callback_with_2x(data, converter_type, ratio=2.0):
+    """
+    Tests that there are no errors if we reuse an object created with a context manager
+    """
+    from samplerate2 import CallbackResampler
+
+    _, input_data = data
+
+    def producer():
+        yield input_data
+        while True:
+            yield None
+
+    channels = input_data.shape[-1] if input_data.ndim == 2 else 1
+
+    callback = lambda p=producer(): next(p)
+
+    with CallbackResampler(
+        callback, ratio, converter_type, channels=channels
+    ) as resampler:
+        resampler.read(int(ratio) * input_data.shape[0] // 2)
+
+    # re-initialize the data producer
+    resampler.read(int(ratio) * input_data.shape[0] // 2)
+
+
 @pytest.mark.parametrize(
     "input_obj,expected_type",
     [

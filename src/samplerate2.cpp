@@ -202,6 +202,21 @@ class CallbackResampler {
   int _converter_type = 0;
   size_t _channels = 0;
 
+ private:
+  void _create() {
+    _state =
+        src_callback_new(the_callback_func, _converter_type, (int)_channels,
+                         &_err_num, static_cast<void *>(this));
+    if (_state == nullptr) error_handler(_err_num);
+  }
+
+  void _destroy() {
+    if (_state != nullptr) {
+      src_delete(_state);
+      _state = nullptr;
+    }
+  }
+
  public:
   CallbackResampler(const callback_t &callback_func, double ratio,
                     const py::object &converter_type, size_t channels)
@@ -209,9 +224,7 @@ class CallbackResampler {
         _ratio(ratio),
         _converter_type(get_converter_type(converter_type)),
         _channels(channels) {
-    _state =
-        src_callback_new(the_callback_func, _converter_type, (int)_channels,
-                         &_err_num, static_cast<void *>(this));
+    _create();
   }
 
   // copy constructor
@@ -221,10 +234,10 @@ class CallbackResampler {
         _converter_type(r._converter_type),
         _channels(r._channels) {
     _state = src_clone(r._state, &_err_num);
-    error_handler(_err_num);
+    if (_state == nullptr) error_handler(_err_num);
   }
 
-  ~CallbackResampler() { src_delete(_state); }
+  ~CallbackResampler() { _destroy(); }
 
   void set_buffer(const np_array_f32 &new_buf) { _current_buffer = new_buf; }
   size_t get_channels() { return _channels; }
@@ -244,6 +257,8 @@ class CallbackResampler {
     std::vector<size_t> out_shape{frames, _channels};
     auto output = py::array_t<float, py::array::c_style>(out_shape);
     py::buffer_info outbuf = output.request();
+
+    if (_state == nullptr) _create();
 
     // read from the callback
     size_t output_frames_gen = src_callback_read(
@@ -287,7 +302,9 @@ class CallbackResampler {
   CallbackResampler clone() const { return CallbackResampler(*this); }
   CallbackResampler &__enter__() { return *this; }
   void __exit__(const py::object &exc_type, const py::object &exc,
-                const py::object &exc_tb) const {}
+                const py::object &exc_tb) {
+    _destroy();
+  }
 };
 
 long the_callback_func(void *cb_data, float **data) {
